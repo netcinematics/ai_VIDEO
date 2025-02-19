@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Recorder with Effects</title>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .video-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        #videoElement, #recordedVideo {
+            width: 100%;
+            max-width: 640px;
+            background-color: #000;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .control-btn {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .control-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .filters {
+            margin: 20px 0;
+        }
+        .screenshot-gallery {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .screenshot {
+            max-width: 200px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video Recorder with Effects</h1>
+        
+        <div class="video-container">
+            <video id="videoElement" autoplay muted></video>
+            <canvas id="filterCanvas" style="display: none;"></canvas>
+        </div>
+
+        <div class="filters">
+            <label for="filterSelect">Apply Filter:</label>
+            <select id="filterSelect">
+                <option value="none">None</option>
+                <option value="grayscale">Grayscale</option>
+                <option value="sepia">Sepia</option>
+                <option value="invert">Invert</option>
+            </select>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="control-btn">Start Recording</button>
+            <button id="stopBtn" class="control-btn" disabled>Stop Recording</button>
+            <button id="screenshotBtn" class="control-btn">Take Screenshot</button>
+        </div>
+
+        <div class="screenshot-gallery" id="screenshotGallery"></div>
+
+        <div class="recorded-video">
+            <h2>Recorded Video</h2>
+            <video id="recordedVideo" controls></video>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream;
+        let filterCanvas;
+        let filterContext;
+        let currentFilter = 'none';
+        let isRecording = false;
+
+        // Initialize video stream
+        async function initializeCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+                
+                const videoElement = document.getElementById('videoElement');
+                videoElement.srcObject = stream;
+
+                // Initialize canvas for filters
+                filterCanvas = document.getElementById('filterCanvas');
+                filterContext = filterCanvas.getContext('2d');
+                
+                // Set canvas size to match video
+                filterCanvas.width = 640;
+                filterCanvas.height = 480;
+
+                // Start applying filters
+                requestAnimationFrame(applyFilter);
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+            }
+        }
+
+        // Apply selected filter to video stream
+        function applyFilter() {
+            const videoElement = document.getElementById('videoElement');
+            filterContext.drawImage(videoElement, 0, 0, filterCanvas.width, filterCanvas.height);
+            
+            const imageData = filterContext.getImageData(0, 0, filterCanvas.width, filterCanvas.height);
+            const pixels = imageData.data;
+
+            switch(currentFilter) {
+                case 'grayscale':
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        const avg = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+                        pixels[i] = avg;     // Red
+                        pixels[i + 1] = avg; // Green
+                        pixels[i + 2] = avg; // Blue
+                    }
+                    break;
+                case 'sepia':
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        const r = pixels[i];
+                        const g = pixels[i + 1];
+                        const b = pixels[i + 2];
+                        pixels[i] = (r * 0.393) + (g * 0.769) + (b * 0.189);     // Red
+                        pixels[i + 1] = (r * 0.349) + (g * 0.686) + (b * 0.168); // Green
+                        pixels[i + 2] = (r * 0.272) + (g * 0.534) + (b * 0.131); // Blue
+                    }
+                    break;
+                case 'invert':
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        pixels[i] = 255 - pixels[i];         // Red
+                        pixels[i + 1] = 255 - pixels[i + 1]; // Green
+                        pixels[i + 2] = 255 - pixels[i + 2]; // Blue
+                    }
+                    break;
+            }
+
+            filterContext.putImageData(imageData, 0, 0);
+            requestAnimationFrame(applyFilter);
+        }
+
+        // Start recording
+        function startRecording() {
+            recordedChunks = [];
+            const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+            
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (err) {
+                console.error('Error creating MediaRecorder:', err);
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                document.getElementById('recordedVideo').src = url;
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            updateButtons();
+        }
+
+        // Stop recording
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            updateButtons();
+        }
+
+        // Take screenshot
+        function takeScreenshot() {
+            const canvas = document.createElement('canvas');
+            canvas.width = filterCanvas.width;
+            canvas.height = filterCanvas.height;
+            canvas.getContext('2d').drawImage(filterCanvas, 0, 0);
+            
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            img.classList.add('screenshot');
+            document.getElementById('screenshotGallery').appendChild(img);
+        }
+
+        // Update button states
+        function updateButtons() {
+            document.getElementById('startBtn').disabled = isRecording;
+            document.getElementById('stopBtn').disabled = !isRecording;
+        }
+
+        // Event listeners
+        document.getElementById('startBtn').addEventListener('click', startRecording);
+        document.getElementById('stopBtn').addEventListener('click', stopRecording);
+        document.getElementById('screenshotBtn').addEventListener('click', takeScreenshot);
+        document.getElementById('filterSelect').addEventListener('change', (e) => {
+            currentFilter = e.target.value;
+        });
+
+        // Initialize camera on load
+        initializeCamera();
+    </script>
+
+</body>
+</html>
