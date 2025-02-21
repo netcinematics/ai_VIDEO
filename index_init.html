@@ -88,35 +88,6 @@
             min-width: 100%;
             object-fit: cover; /* Crops to fill container */
         }
-        .video-controls {
-        background: #111;
-        padding: 20px;
-        border-radius: 13px;
-        border: 1px solid steelblue;
-        margin: 10px;
-    }
-    
-    .slider-group {
-        margin: 10px 0;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .slider-group label {
-        min-width: 150px;
-        color: aqua;
-    }
-    
-    .slider-group input[type="range"] {
-        flex-grow: 1;
-        background: #222;
-    }
-    
-    .slider-group span {
-        min-width: 50px;
-        color: lime;
-    }
     </style>
 </head>
 <body>
@@ -139,34 +110,6 @@
                 <option value="invert">Invert</option>
             </select>
         </div>
-
-        <div class="video-controls">
-    <div class="slider-group">
-        <label>Resolution Width (px)</label>
-        <input type="range" id="widthSlider" min="480" max="3840" value="1920" step="160">
-        <span id="widthValue">1920</span>
-    </div>
-    <div class="slider-group">
-        <label>Resolution Height (px)</label>
-        <input type="range" id="heightSlider" min="360" max="2160" value="1080" step="120">
-        <span id="heightValue">1080</span>
-    </div>
-    <div class="slider-group">
-        <label>Frame Rate (fps)</label>
-        <input type="range" id="fpsSlider" min="15" max="60" value="30" step="5">
-        <span id="fpsValue">30</span>
-    </div>
-    <div class="slider-group">
-        <label>Video Bitrate (Mbps)</label>
-        <input type="range" id="bitrateSlider" min="1" max="50" value="8" step="1">
-        <span id="bitrateValue">8</span>
-    </div>
-    <div class="slider-group">
-        <label>Audio Quality (kbps)</label>
-        <input type="range" id="audioSlider" min="64" max="320" value="128" step="32">
-        <span id="audioValue">128</span>
-    </div>
-</div>
 
         <div class="controls">
             <button id="startBtn" class="control-btn">Start Recording</button>
@@ -191,23 +134,11 @@
         let currentFilter = 'none';
         let isRecording = false;
 
-        let videoConstraints = {
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30 }
-    };
-
-    let recorderOptions = {
-        mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 8000000,
-        audioBitsPerSecond: 128000
-    };
-
         // Initialize video stream
         async function initializeCamera() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: videoConstraints, 
+                    video: true, 
                     audio: true 
                 });
                 
@@ -331,35 +262,6 @@
         document.getElementById('filterSelect').addEventListener('change', (e) => {
             currentFilter = e.target.value;
         });
-
-        document.querySelectorAll('.slider-group input').forEach(slider => {
-        slider.addEventListener('input', (e) => {
-            const value = e.target.value;
-            document.getElementById(e.target.id.replace('Slider', 'Value')).textContent = value;
-            
-            switch(e.target.id) {
-                case 'widthSlider':
-                    videoConstraints.width.ideal = parseInt(value);
-                    break;
-                case 'heightSlider':
-                    videoConstraints.height.ideal = parseInt(value);
-                    break;
-                case 'fpsSlider':
-                    videoConstraints.frameRate.ideal = parseInt(value);
-                    break;
-                case 'bitrateSlider':
-                    recorderOptions.videoBitsPerSecond = parseInt(value) * 1000000;
-                    break;
-                case 'audioSlider':
-                    recorderOptions.audioBitsPerSecond = parseInt(value) * 1000;
-                    break;
-            }
-            
-            if (!isRecording) {
-                initializeCamera();
-            }
-        });
-    });
 
         // Initialize camera on load
         initializeCamera();
